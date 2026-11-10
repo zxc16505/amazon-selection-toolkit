@@ -39,3 +39,34 @@ block_max_len: 20000
 # 429/503 退避（秒）。优先读 Retry-After，没有则按此列表递增
 max_attempts: 3
 backoff_seconds: [30, 90]
+
+# 商品详情页路径模板
+detail_path: "/dp/{}"
+
+# 上架素材生成的合规规则（只做预检，不代表平台审核结果）
+material:
+  title_max_chars: 200
+  bullet_max_chars: 500
+  # 单次最多采集几个竞品（控制请求量）
+  max_competitors: 5
+
+  # 平台禁用的绝对化 / 促销表述
+  banned_phrases:
+    - "best seller"
+    - "best-selling"
+    - "#1"
+    - "number one"
+    - "guarantee"
+    - "free shipping"
+    - "lowest price"
+    - "100% satisfaction"
+
+  # 类目宣称红线：命中即阻断
+  category_rules:
+    electronics:
+      - pattern: '\b(cure|treat|heals?|therapeutic|FDA[-\s]?approved|medical[-\s]grade)\b'
+        message: "电子类目不得宣称医疗功效或未获批资质"
+    beauty:
+      - pattern: '\b(cure|treat|heals?|FDA[-\s]?approved)\b'
+        message: "美妆类目不得宣称疗效"
+

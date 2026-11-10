@@ -30,6 +30,8 @@ class Config:
     block_max_len: int
     max_attempts: int
     backoff_seconds: tuple[int, ...]
+    detail_path: str = "/dp/{}"
+    material: dict = None
 
     @classmethod
     def load(cls, path: Path | None = None) -> "Config":
@@ -48,6 +50,8 @@ class Config:
             block_max_len=data["block_max_len"],
             max_attempts=data["max_attempts"],
             backoff_seconds=tuple(data["backoff_seconds"]),
+            detail_path=data.get("detail_path", "/dp/{}"),
+            material=data.get("material") or {},
         )
 
 

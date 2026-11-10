@@ -1,7 +1,10 @@
-# 跨境榜单追踪（Amazon Best Sellers）
+# 跨境选品工具（Amazon 榜单追踪 + 上架素材生成）
 
 按站点采集 Amazon 榜单（排名、ASIN、标题、价格、评分、评论数），落 SQLite；
 每次运行与上一次快照做 diff：新进榜 / 上升 / 下降 / 掉出 / 价格变动。
+
+在此之上提供**上架素材生成**：采集目标品与竞品详情页，产出竞品价格带、
+高频关键词、类目合规预检报告，**全程只读，不触发任何上架/提交动作**。
 
 自建，用于理解跨境电商选品侧的数据采集与变化追踪，**不是生产系统**：
 单机脚本、单日一次、无分布式调度、无代理池。
@@ -48,7 +51,29 @@
 遇到拦截就停。这个项目采的是公开榜单，**不值得为一次采集把出口 IP 搭进去**——
 被标记之后影响的是这台机器上所有要走同一个出口的事。
 
-## 三、实测输出
+## 三、上架素材生成（只读）
+
+`material` 子命令做两件事：**给出对标数据**、**提前拦下违规文案**。
+它不登录卖家后台、不调 SP-API、不写任何平台字段——产出是一份给运营看的 Markdown。
+
+```
+目标 ASIN + 竞品 ASIN 列表
+   → 逐个取商品详情页（复用第二节的 cookie 复用 / 条件请求 / 拦截即停）
+   → 解析：标题、品牌、价格、评分、评论数、类目路径、五点描述
+   → 汇总：竞品价格带（最低 / 中位 / 最高）、高频词与二元短语
+   → 合规预检：标题超长、五点不足、禁用绝对化表述、类目宣称红线
+   → 输出 data/material/<ASIN>-<日期>.md 与同名 .json
+```
+
+合规预检分两级：`[阻断]` 是明确不能上架的（如电子类目宣称医疗功效、
+文案含 `best seller` / `#1` / `guarantee`），`[提醒]` 是建议修改的（如五点条数不足）。
+规则全部外置在 `config.yaml` 的 `material:` 段，改规则不用改代码。
+
+关于「自动上架」：**不做**。合规通道只有 Amazon SP-API 的 Listings Items API，
+且需要卖家授权；用 RPA 点卖家后台发布商品属于违规操作，有封店与法律风险。
+所以这里把边界划在「素材与预检」，最后一步的提交留给运营在后台人工确认。
+
+## 四、实测输出
 
 `python tracker.py --markets com --category electronics --top 30`
 
@@ -80,7 +105,7 @@ FROM t WHERE prev_rank IS NOT NULL AND rank - prev_rank >= 10
 ORDER BY delta DESC;
 ```
 
-## 四、实测踩到的三个问题
+## 五、实测踩到的三个问题
 
 **1. 币种随出口地域漂移。**
 不指定币种时，从国内出口访问 `amazon.com` 返回 **CNY 报价**（实测第一条 `CNY 80.07`，
@@ -98,58 +123,75 @@ ORDER BY delta DESC;
 脚本用「页面小于 20KB **且** 命中特征串」两个条件一起判，避免误伤正常页；
 命中后中断整轮全部后续请求，退出码 2。
 
-## 五、合规性
+## 六、合规性
 
 - `https://www.amazon.com/robots.txt` 的 `User-agent: *` 段**未禁止** `/gp/bestsellers/`，本项目只取公开榜单页。
 - 榜单页无需登录，不含个人信息；不采集买家信息、不采集订单。
 - 请求头只带常规的 UA / Accept / Accept-Language / Referer，不做指纹伪装。
 
-## 六、用法
+## 七、用法
 
 ```bash
 pip install -r requirements.txt
 
+# 榜单追踪
 python tracker.py --markets com              # 默认类目 electronics、取前 30
 python tracker.py --markets com co.uk de --top 10
 python tracker.py --list new-releases        # 新品榜
 python tracker.py --markets com --force      # 当天已采过仍重跑（不建议）
+
+# 上架素材生成
+python tracker.py material --asin B012345678 --market com --category electronics \
+    --competitors B087654321 B0ABCDEF12
+python tracker.py material --asin B012345678 --market com --category electronics \
+    --from-html a.html b1.html b2.html       # 离线：从本地 HTML 解析，不发请求
 ```
 
 站点代码：`com` `co.uk` `de` `co.jp` `ca` `com.au`。
 （实测当前网络环境下 `co.jp` 连接超时，属站点可达性问题，不影响其他站点入库。）
 
+`material` 的 `--from-html` 模式不需要联网：第一个文件是目标品，其余是竞品，
+适合在没有可用出口、或只想调解析/规则时把整条链路跑通（CI 就是这么测的）。
+
 `data/request_log` 表记录每次请求的状态、耗时与备注，可以据此看拦截是从哪一次开始的。
 
-## 七、边界
+## 八、边界
 
 - 未做：分布式调度、失败重试队列、告警推送、增量断点续跑。单日一次跑完即可，量级不需要。
 - 排名与价格本身会变，库里存的是「某天看到的快照」，不是实时值。
 - 榜单结构改版会导致解析到 0 条，脚本会报「页面结构可能变化」而不是静默入库空数据。
+- 素材生成只读详情页、只产出本地文件；**不做自动上架**，也不接管卖家后台。
+- 竞品采集数量默认上限 5 个（`config.yaml` 的 `material.max_competitors`），避免一次请求过多页。
 
-## 八、目录
+## 九、目录
 
 ```
 tracker.py              兼容入口（python tracker.py == python -m amazon_tracker.cli）
-config.yaml             站点 / UA / 拦截特征 / 退避等配置，外置不改代码
+config.yaml             站点 / UA / 拦截特征 / 退避 / 合规规则，外置不改代码
 requirements.txt
 
 amazon_tracker/
-├── cli.py              argparse 入口：编排一次完整采集
+├── cli.py              argparse 入口：crawl / material 两个子命令
 ├── config.py           Config / Market 数据类 + YAML 加载
-├── fetch.py            HTTP 采集（唯一发网络请求的模块）
+├── fetch.py            HTTP 采集（唯一发网络请求的模块，榜单页与详情页共用）
 ├── parser.py           榜单页解析 + 价格拼接
+├── detail.py           商品详情页解析（标题 / 品牌 / 价格 / 评分 / 类目 / 五点）
+├── material.py         关键词、价格带、合规预检、素材 Markdown 渲染（纯函数）
 ├── storage.py          SQLite 存储 + request_log
 ├── diff.py             与上次快照对比（新进榜 / 升降 / 掉出 / 价格变动）
 └── utils.py            纯函数：parse_price / is_block / retry_after
 
 tests/
-└── test_tracker.py     20 条单元测试，全离线，CI 每次跑
+├── test_tracker.py     20 条单元测试（解析 / 价格 / 退避 / 拦截 / diff）
+├── test_material.py    16 条单元测试（详情解析 / 价格带 / 关键词 / 规则 / 渲染）
+└── fixtures/           离线 HTML 样本，测试与演示都不联网
 
-.github/workflows/ci.yml  lint + 编译 + 单元测试 + CLI help
+.github/workflows/ci.yml  编译 + 单元测试 + CLI help
 data/                  运行时产物（已 .gitignore）
   ├── ranks.sqlite3
   ├── cookies.json
-  └── http_cache.json
+  ├── http_cache.json
+  └── material/        生成的上架素材（Markdown + JSON）
 ```
 
-**为什么要拆模块**：`fetch.py` 是唯一发网络请求的——以后任何想加"多线程并发""代理池""Playwright 渲染"，都改这一个文件；`utils.py` + `diff.py` + `parser.py` 是纯函数，直接写单元测试覆盖；`cli.py` 保持薄，只管"先判断今天要不要跑 → 跑 → 存 → 对比"。
+**为什么要拆模块**：`fetch.py` 是唯一发网络请求的——以后任何想加"多线程并发""代理池""Playwright 渲染"，都改这一个文件；`utils.py` + `diff.py` + `parser.py` + `detail.py` + `material.py` 是纯函数，直接写单元测试覆盖；`cli.py` 保持薄，只管"先判断今天要不要跑 → 跑 → 存 → 对比"或"取详情 → 汇总 → 校验 → 出素材"。

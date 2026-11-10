@@ -19,12 +19,24 @@ class RiskControl(Exception):
 
 def fetch(session: requests.Session, market: Market, list_type_path: str,
           category: str, cache: dict, cfg: "Config") -> tuple[str | None, str]:
-    """请求榜单页。返回 (html 或 None 表示 304, 说明)。
+    """请求榜单页。返回 (html 或 None 表示 304, 说明)。"""
+    return fetch_url(session, market, list_type_path.format(category), cache, cfg)
 
-    调用方负责：已决定今天还没采过、愿意发这个请求。
-    这里只关心单次请求，重试 2 次（含首轮）。命中拦截抛 RiskControl。
+
+def fetch_detail(session: requests.Session, market: Market, asin: str,
+                 cache: dict, cfg: "Config") -> tuple[str | None, str]:
+    """请求商品详情页。与榜单共用节流、缓存、拦截判定。"""
+    return fetch_url(session, market, cfg.detail_path.format(asin), cache, cfg)
+
+
+def fetch_url(session: requests.Session, market: Market, path: str,
+              cache: dict, cfg: "Config") -> tuple[str | None, str]:
+    """请求任意站内路径。返回 (html 或 None 表示 304, 说明)。
+
+    调用方负责：已决定愿意发这个请求。这里只关心单次请求。
+    命中拦截抛 RiskControl，调用方必须停止全部后续请求。
     """
-    url = "https://" + market.host + list_type_path.format(category)
+    url = "https://" + market.host + path
     headers = {
         "User-Agent": cfg.user_agent,
         "Accept-Language": market.accept_language,

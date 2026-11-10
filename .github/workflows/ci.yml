@@ -27,10 +27,12 @@ jobs:
 
       - name: Lint (import + ast parse each module)
         run: |
-          python -c "import amazon_tracker.cli, amazon_tracker.config, amazon_tracker.utils, amazon_tracker.parser, amazon_tracker.storage, amazon_tracker.diff, amazon_tracker.fetch"
+          python -c "import amazon_tracker.cli, amazon_tracker.config, amazon_tracker.utils, amazon_tracker.parser, amazon_tracker.storage, amazon_tracker.diff, amazon_tracker.fetch, amazon_tracker.detail, amazon_tracker.material"
 
       - name: Unit tests (offline — no network)
         run: python -m unittest discover -s tests -v
 
       - name: CLI help smoke test
-        run: python tracker.py --help
+        run: |
+          python tracker.py --help
+          python tracker.py material --help
