@@ -1,0 +1,7 @@
+# 运行时产物——不进仓库，每个人本地各自一份
+__pycache__/
+*.pyc
+data/
+*.sqlite3
+*.sqlite3-journal
+.venv/
