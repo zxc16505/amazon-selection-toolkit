@@ -129,9 +129,27 @@ python tracker.py --markets com --force      # 当天已采过仍重跑（不建
 ## 八、目录
 
 ```
-tracker.py          采集 + 解析 + 落库 + diff（单文件）
+tracker.py              兼容入口（python tracker.py == python -m amazon_tracker.cli）
+config.yaml             站点 / UA / 拦截特征 / 退避等配置，外置不改代码
 requirements.txt
-data/ranks.sqlite3    运行后生成：ranks（快照）+ request_log（请求日志）
-data/cookies.json     会话复用
-data/http_cache.json  ETag / Last-Modified
+
+amazon_tracker/
+├── cli.py              argparse 入口：编排一次完整采集
+├── config.py           Config / Market 数据类 + YAML 加载
+├── fetch.py            HTTP 采集（唯一发网络请求的模块）
+├── parser.py           榜单页解析 + 价格拼接
+├── storage.py          SQLite 存储 + request_log
+├── diff.py             与上次快照对比（新进榜 / 升降 / 掉出 / 价格变动）
+└── utils.py            纯函数：parse_price / is_block / retry_after
+
+tests/
+└── test_tracker.py     20 条单元测试，全离线，CI 每次跑
+
+.github/workflows/ci.yml  lint + 编译 + 单元测试 + CLI help
+data/                  运行时产物（已 .gitignore）
+  ├── ranks.sqlite3
+  ├── cookies.json
+  └── http_cache.json
 ```
+
+**为什么要拆模块**：`fetch.py` 是唯一发网络请求的——以后任何想加"多线程并发""代理池""Playwright 渲染"，都改这一个文件；`utils.py` + `diff.py` + `parser.py` 是纯函数，直接写单元测试覆盖；`cli.py` 保持薄，只管"先判断今天要不要跑 → 跑 → 存 → 对比"。

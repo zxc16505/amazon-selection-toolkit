@@ -1,0 +1,41 @@
+# 站点配置（code 对应 CLI --markets 参数）
+markets:
+  com:
+    host: www.amazon.com
+    currency: USD
+    accept_language: en-US,en;q=0.9
+  co.uk:
+    host: www.amazon.co.uk
+    currency: GBP
+    accept_language: en-GB,en;q=0.9
+  de:
+    host: www.amazon.de
+    currency: EUR
+    accept_language: de-DE,de;q=0.9
+  co.jp:
+    host: www.amazon.co.jp
+    currency: JPY
+    accept_language: ja-JP,ja;q=0.9
+  ca:
+    host: www.amazon.ca
+    currency: CAD
+    accept_language: en-CA,en;q=0.9
+  com.au:
+    host: www.amazon.com.au
+    currency: AUD
+    accept_language: en-AU,en;q=0.9
+
+# UA 要固定成"看起来像同一台 Chrome"，不随机化
+user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
+# 拦截页小于此字节数 + 命中下面任一特征串 → 判定为拦截
+block_markers:
+  - "api-services-support@amazon.com"
+  - "Robot Check"
+  - "automated access to Amazon data"
+  - "Enter the characters you see below"
+block_max_len: 20000
+
+# 429/503 退避（秒）。优先读 Retry-After，没有则按此列表递增
+max_attempts: 3
+backoff_seconds: [30, 90]
