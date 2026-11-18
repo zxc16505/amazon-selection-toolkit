@@ -48,8 +48,7 @@ def report(market_code: str, list_type: str, category: str, run_date: str,
         print("  （首次运行，下次再跑即可看到排名/价格变化）")
         return
     for key, label in [("new", "新进榜"), ("up", f"上升 {rank_threshold} 名以上"),
-                       ("down", f"下降 {rank_threshold} 名以上")] \
-            if False else [("new", "新进榜"), ("up", "上升 3 名以上"), ("down", "下降 3 名以上")]:
+                       ("down", f"下降 {rank_threshold} 名以上")]:
         if d[key]:
             print(f"  {label}:")
             for item in d[key]:
